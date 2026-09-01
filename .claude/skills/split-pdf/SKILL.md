@@ -43,46 +43,17 @@ If found, ask:
 
 This prevents redundant re-reading of papers you have already processed. The `_text.md` file is a structured plain-text extraction that is far cheaper to read than re-processing the PDF page images.
 
-**If no extract exists, check for existing splits.** Determine the build directory:
-
-```python
-import os
-folder_path = os.path.dirname(os.path.abspath(pdf_path))
-foldername  = os.path.basename(folder_path)
-pdf_basename = os.path.splitext(os.path.basename(pdf_path))[0]
-build_dir = os.path.join(folder_path, foldername + '_build')
-split_dir = os.path.join(build_dir, 'split_' + pdf_basename)
-```
+**If no extract exists, check for existing splits.** Use the build directory convention `<foldername>_build/split_<pdf-basename>/`.
 
 If `split_dir` already exists and contains `.pdf` files, ask:
 > "Splits already exist for `<pdf-basename>` (N chunks in `<foldername>_build/split_<pdf-basename>/`). Reuse existing splits, or re-split from scratch?"
 - **Reuse**: skip splitting, proceed to Step 3 using the existing files in `split_dir`
 - **Re-split**: delete the existing split folder, then proceed with splitting below
 
-Create splits in `<foldername>_build/split_<pdf-basename>/` and run the splitting script:
+Create splits by running:
 
-```python
-from PyPDF2 import PdfReader, PdfWriter
-import os, sys
-
-def split_pdf(input_path, output_dir, pages_per_chunk=4):
-    os.makedirs(output_dir, exist_ok=True)
-    reader = PdfReader(input_path)
-    total = len(reader.pages)
-    prefix = os.path.splitext(os.path.basename(input_path))[0]
-
-    for start in range(0, total, pages_per_chunk):
-        end = min(start + pages_per_chunk, total)
-        writer = PdfWriter()
-        for i in range(start, end):
-            writer.add_page(reader.pages[i])
-
-        out_name = f"{prefix}_pp{start+1}-{end}.pdf"
-        out_path = os.path.join(output_dir, out_name)
-        with open(out_path, "wb") as f:
-            writer.write(f)
-
-    print(f"Split {total} pages into {-(-total // pages_per_chunk)} chunks in {output_dir}")
+```bash
+python3 ~/.claude/skills/split-pdf/scripts/split.py path/to/paper.pdf
 ```
 
 **Directory convention:**
@@ -103,7 +74,7 @@ The build directory convention (`<foldername>_build/`) keeps split artifacts, co
 
 The original PDF remains permanently. The splits are working copies. If anything goes wrong, you can always re-split from the original.
 
-If PyPDF2 is not installed, install it: `pip install PyPDF2`
+If pypdf is not installed, install it: `pip install pypdf`
 
 ## Step 3: Read in Batches of 3 Splits
 
@@ -123,6 +94,18 @@ Do NOT read ahead. Do NOT read all splits at once. The pause-and-confirm protoco
 
 As you read, collect information along these dimensions and write them into `notes.md`:
 
+0. **Bibliographic metadata** — From the first split (title page), extract:
+   ```
+   ## Bibliographic metadata
+   doi: <10.xxxx/yyyy if present on the title page, else null>
+   authors: [LastName1, LastName2, ...]
+   title: <verbatim title from title page>
+   year: <year>
+   venue: <journal/working paper series/etc., verbatim>
+   venue_type: journal | working_paper | book_chapter | other
+   ```
+   If a field is not visible on the title page, record `null`.
+
 1. **Research question** — What is the paper asking and why does it matter?
 2. **Audience** — Which sub-community of researchers cares about this?
 3. **Method** — How do they answer the question? What is the identification strategy?
@@ -136,11 +119,11 @@ These questions extract what a researcher needs to **build on or replicate** the
 
 ## The Notes File
 
-The working notes file is `notes.md` in the split subdirectory, updated incrementally after each batch. Structure it with clear headers for each of the 8 dimensions. After each batch, update whichever dimensions have new information — do not rewrite from scratch.
+The working notes file is `notes.md` in the split subdirectory, updated incrementally after each batch. Structure it with clear headers for the bibliographic metadata block and each of the eight research dimensions. After each batch, update whichever dimensions have new information — do not rewrite from scratch.
 
 By the time all splits are read, the notes should contain specific data sources, variable names, equation references, sample sizes, coefficient estimates, and standard errors. Not a summary — a structured extraction.
 
-**After all batches are complete**, write the final notes to `<basename>_text.md` in the same folder as the source PDF:
+**After all batches are complete**, write the final notes to `<basename>_text.md` in the same folder as the source PDF, with the `## Bibliographic metadata` block first:
 
 ```
 articles/smith_2024_text.md
@@ -172,9 +155,18 @@ Text output: <text_path>
 Process:
 1. Read 3 PDF files at a time using the Read tool
 2. After each batch, update the notes file with extracted content
-3. Extract: research question, audience, method, data (sources, sample size, time period),
+3. From the first split (title page), extract a bibliographic metadata block:
+   ## Bibliographic metadata
+   doi: <10.xxxx/yyyy if present on the title page, else null>
+   authors: [LastName1, LastName2, ...]
+   title: <verbatim title from title page>
+   year: <year>
+   venue: <journal/working paper series/etc., verbatim>
+   venue_type: journal | working_paper | book_chapter | other
+4. Extract: research question, audience, method, data (sources, sample size, time period),
    statistical methods, findings, contributions, replication feasibility
-4. Write the final structured extraction to the text output path
+5. Write the final structured extraction to the text output path, with the
+   ## Bibliographic metadata block first, followed by the research notes.
 
 Report when done: pages read, figures/tables found, one-sentence content summary.
 ```
@@ -201,8 +193,4 @@ After the agent returns, the parent reads the output files (plain markdown, not 
 | **Persist** | Save final extraction to `<basename>_text.md` alongside the source PDF |
 | **Confirm** | Ask user before continuing to next batch |
 
-## Acknowledgments
-
-The in-place PDF handling, persistent `_text.md` extraction, split reuse, build directory convention, and agent isolation protocol were inspired by improvements identified by [Ben Bentzin](https://www.mccombs.utexas.edu) (Associate Professor of Instruction, McCombs School of Business, University of Texas at Austin), who adapted the original skill for his own workflows and shared his findings (April 2026). His version demonstrated that subagent isolation prevents context bloat when reading multiple large PDFs in a single session — a critical reliability improvement. The implementation here is independently written but the ideas are his.
-
-For detailed explanation of why the batched-reading method works, see [methodology.md](methodology.md).
+For detailed explanation of why the batched-reading method works, see [methodology.md](methodology.md). Acknowledgments and credits live in [README.md](README.md).

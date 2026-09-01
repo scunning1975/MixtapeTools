@@ -6,7 +6,7 @@
 
 ## What This Skill Does
 
-You give Claude a paper — either a local PDF file or a search query like "Gentzkow Shapiro 2014 competition newspapers" — and it does the rest. It finds the paper online and downloads it (or uses your local file in place), splits it into 4-page chunks using pypdf, then reads those chunks in small batches (3 at a time, ~12 pages), pausing between each batch for your review. As it reads, it writes structured notes into a `notes.md` file, extracting specific information across 8 dimensions. When finished, it saves a persistent `_text.md` extraction alongside the source PDF so future invocations can skip re-reading entirely.
+You give Claude a paper — either a local PDF file or a search query like "Gentzkow Shapiro 2014 competition newspapers" — and it does the rest. It finds the paper online and downloads it (or uses your local file in place), splits it into 4-page chunks using pypdf, then reads those chunks in small batches (3 at a time, ~12 pages), pausing between each batch for your review. As it reads, it writes structured notes into a `notes.md` file, extracting a bibliographic metadata block plus eight research dimensions. When finished, it saves a persistent `_text.md` extraction alongside the source PDF so future invocations can skip re-reading entirely.
 
 ---
 
@@ -47,10 +47,11 @@ Split the PDF into 4-page chunks, read 3 chunks at a time (~12 pages), and write
 
 **You must tell Claude what paper to read.** Claude cannot webcrawl for a paper it doesn't know exists. Provide either a local file path or a search query specific enough to find the paper — an author name, title, keywords, year, or some combination. If you just type `/split-pdf` with nothing else, Claude will ask you what you're looking for.
 
-### What Gets Extracted (8 Dimensions)
+### What Gets Extracted
 
-The skill produces a **structured extraction** — more detailed and specific than a typical summary, organized around the dimensions a researcher needs to build on or replicate the work:
+The skill produces a **structured extraction** — more detailed and specific than a typical summary. It starts with a `## Bibliographic metadata` block, then records the dimensions a researcher needs to build on or replicate the work:
 
+0. **Bibliographic metadata** — DOI, authors, title, year, venue, and venue type when visible on the title page
 1. **Research question** — What is the paper asking and why does it matter?
 2. **Audience** — Which sub-community of researchers cares about this?
 3. **Method** — How do they answer the question? What is the identification strategy?
@@ -124,59 +125,6 @@ articles/                             # any working folder
 ```
 
 **The original PDF is never deleted.** Whether Claude downloaded it via web search or you pointed it to a local file, the original always stays where it was. The split files are derivatives. If anything goes wrong — a corrupted split, a re-read with different parameters — you can always re-split from the original.
-
----
-
-## Example: Gentzkow, Shapiro & Sinkinson (AER 2014)
-
-This directory contains a complete worked example showing the full pipeline from start to finish.
-
-### What happened
-
-The user typed:
-
-```
-/split-pdf "Gentzkow Shapiro Sinkinson competition ideological diversity newspapers"
-```
-
-Claude searched the web, found the paper on Matt Gentzkow's website at `https://web.stanford.edu/~gentzkow/research/competition.pdf`, downloaded it to a local `articles/` directory, and then split and read it. The original PDF was **kept** — only the splits were created alongside it.
-
-### What's in this directory
-
-```
-gentskow_shapiro_competition/
-├── gs_competition_pp1-4.pdf       # pages 1-4 (intro, motivation, preview)
-├── gs_competition_pp5-8.pdf       # pages 5-8 (data, descriptive analysis)
-├── gs_competition_pp9-12.pdf      # pages 9-12 (descriptive results, model setup)
-├── gs_competition_pp13-16.pdf     # pages 13-16 (model continued, identification)
-├── gs_competition_pp17-20.pdf     # pages 17-20 (model structure, assumptions)
-├── gs_competition_pp21-24.pdf     # pages 21-24 (estimation, demand side)
-├── gs_competition_pp25-28.pdf     # pages 25-28 (supply estimation, parameter estimates)
-├── gs_competition_pp29-32.pdf     # pages 29-32 (model fit, welfare analysis)
-├── gs_competition_pp33-36.pdf     # pages 33-36 (policy experiments, robustness)
-├── gs_competition_pp37-40.pdf     # pages 37-40 (appendix, references)
-├── gs_competition_pp41-42.pdf     # pages 41-42 (remaining references)
-└── notes.md                       # structured reading notes (all 8 dimensions)
-```
-
-The original PDF would sit one level up in `articles/` — it is not included here to keep the repo size reasonable, but in actual use it is always preserved.
-
-### The reading process
-
-The 42-page paper was split into 11 chunks (ten 4-page chunks + one 2-page chunk). Claude read them in 4 rounds:
-
-| Round | Splits read | Pages | What was covered |
-|-------|-------------|-------|------------------|
-| 1 | pp1-4, pp5-8, pp9-12 | 1-12 | Introduction, data, descriptive results |
-| 2 | pp13-16, pp17-20, pp21-24 | 13-24 | Structural model, identification, estimation |
-| 3 | pp25-28, pp29-32, pp33-36 | 25-36 | Parameter estimates, welfare, policy experiments |
-| 4 | pp37-40, pp41-42 | 37-42 | Appendix robustness, references |
-
-After each round, Claude paused and asked whether to continue. The `notes.md` file was updated incrementally after each batch.
-
-### What the notes look like
-
-Open [`notes.md`](gentskow_shapiro_competition/notes.md) to see the full output. It's a structured extraction across all 8 dimensions — more detailed than a typical summary — including specific coefficient estimates, standard errors, equation numbers, exact data sources with where they were obtained, sample sizes, and a detailed assessment of replication feasibility.
 
 ---
 
