@@ -1,166 +1,139 @@
 ---
 name: tikz
-description: Quick visual-collision check for figures — TikZ inside .tex files OR rendered .png/.jpg/.pdf figures from R/Python. Three checks only. (1) Bezier-curve label collisions via gap math. (2) Label-to-object whitespace. (3) Labels touching or running off the figure edge. These are the visual errors that compile cleanly — pdflatex never warns about them, ggsave never refuses to write them, so the agent that produced them does not know they are wrong. Use after generating any figure where visual correctness matters and you cannot eyeball it yourself.
-allowed-tools: Bash(grep*), Bash(ls*), Bash(file*), Bash(wc*), Read, Edit
-argument-hint: [path/to/file.tex | path/to/figure.png | path/to/figure.pdf]
+description: Audit and fix residual TikZ visual collisions in any .tex file. A downstream repair tool — not a safety net. The upstream defense is /beautiful_deck Step 4.4, which writes safe TikZ from the start. Use /tikz when labels overlap arrows, text sits on boxes, or arrows cross each other. Applies mathematical gap calculations and Bézier depth formulas — no eyeballing.
+allowed-tools: Bash(pdflatex*), Bash(grep*), Bash(ls*), Read, Edit, Glob
+argument-hint: [path/to/file.tex]
 ---
 
-# `/tikz`: narrow visual-collision check
+# TikZ Collision Audit
 
-A small, fast collision check for figures. Three checks. Catches the class of error that produces no warning, no error, no exit code — only a wrong-looking figure that the producing agent cannot see.
+**Purpose**: Find and fix residual visual collisions in TikZ figures in a given `.tex` file. Labels on arrows, text inside boxes, arrows crossing arrows — this skill catches them using measurement, not intuition.
 
-This skill replaced an earlier six-pass version that ran an entire-file re-audit after every fix. That version timed out on real decks. This version does **three checks, one pass, exits**. If you want more, run it again.
-
----
-
-## Step 1: Identify the input
-
-Routing depends on file type:
-
-| Extension | Mode | What gets checked |
-|---|---|---|
-| `.tex` | **Math mode** | TikZ source — gap calculations, coordinate distances |
-| `.png`, `.jpg`, `.jpeg` | **Visual mode** | Rendered raster — read the image, look |
-| `.pdf` (single-figure) | **Visual mode** | Same: read and look |
-| `.pdf` (multi-page deck) | **Refuse** | Out of scope. Run `/tikz` on the figure file or the standalone .tex. |
-
-If the user did not specify a file, ask. Do not guess.
+**The fundamental rule**: Claude cannot reliably eyeball where TikZ elements land. All placement must be verified mathematically before declaring it safe.
 
 ---
 
-## The three checks (both modes apply them, just differently)
+## Critical context: this is a repair tool, not the primary defense
 
-### Check 1 — Bezier curve label collisions
+`/tikz` runs **after** TikZ has been generated. It audits existing code and fixes what it finds. But it cannot reliably fix diagrams that were never built with measurement in mind.
 
-A curved arrow has an arc that bows away from the chord between its endpoints. If a label sits in that arc, it gets crossed by the line.
+**The upstream defense is `/beautiful_deck` Step 4.4**, which writes safe TikZ from the start: explicit node dimensions, directional keywords on every edge label, coordinate map comments, canonical templates, no `scale` on complex diagrams.
 
-### Check 2 — Label-to-object whitespace
+**When Step 4.4 was applied**: `/tikz` should find few or no issues. Run it as a check.
 
-Every text label needs at least 0.4 cm (or visible whitespace, in raster terms) between its bounding box and any drawn shape — node, axis, marker, bar.
-
-### Check 3 — Labels touching or running off the figure edge
-
-Every label has to be entirely inside the figure bounds, with at least 0.5 cm clearance from the edge. Labels at the right margin, top margin, or rotated y-axis labels are the typical offenders.
+**When Step 4.4 was NOT applied** (legacy TikZ, hand-written diagrams, inherited decks): `/tikz` does its best, but expect more findings, more iteration, and lower reliability on autosized nodes and scaled diagrams.
 
 ---
 
-## Math mode (for `.tex` files)
+## Step 1: Read the rule book
 
-For each `\begin{tikzpicture}` block:
+The full rule book — every formula, every clearance table, every worked example — lives at `~/.claude/skills/tikz/tikz_rules.md`. **Read it first.** This SKILL.md is the operational checklist; `tikz_rules.md` is the reference. Do not try to execute the audit from memory.
 
-### Check 1: Bezier curves
+The same rule book is read by `/beautiful_deck` Step 4.4 (generation-time prevention). Single source of truth.
+
+---
+
+## Step 2: Identify the file and run the pre-check
+
+If the user specified a file, use it. If not, ask. Then:
 
 ```bash
-grep -n "bend" [file].tex
+grep -n "tikzpicture\|begin{frame}\|node\|draw\|bend\|foreach" [file].tex | head -100
 ```
 
-For each curved arrow with `bend left=N` or `bend right=N`:
+Get a sense of scope: how many TikZ diagrams, how many frames, how many arrows.
 
+### Pre-check: were the generation rules followed?
+
+Quickly assess whether the TikZ was written safely:
+
+```bash
+grep -n "\\\\node" [file].tex | grep -v "minimum"   # autosized nodes
+grep -n "scale=" [file].tex                          # scale on tikzpicture
+grep -n "% Coordinate map\|% Node map\|% Layout" [file].tex   # coordinate maps
 ```
-chord_length = distance between the two endpoints (cm)
-max_depth    = (chord_length / 2) × tan(N / 2)
-safe_zone    = max_depth + 0.5 cm
-```
 
-| Bend angle | tan(angle/2) |
-|---|---|
-| 20° | 0.176 |
-| 30° | 0.268 |
-| 45° | 0.414 |
-| 60° | 0.577 |
-
-If any label coordinate is within `safe_zone` of the chord baseline (in the direction the curve bends): flag and propose a position outside the safe zone.
-
-### Check 2: Whitespace
-
-For each `\node` containing label text and each adjacent `\draw` shape (rectangle, circle, line):
-
-- Compute label center
-- Compute shape boundary
-- Required clearance: 0.4 cm
-
-If a label coordinate lands within 0.4 cm of a boundary: flag and propose moving it 0.4 cm outside.
-
-### Check 3: Edge clipping
-
-For each `\node`, `\draw`, `\fill`:
-
-- Note extreme x/y coordinates
-- Compare against `\useasboundingbox` if declared, otherwise the implicit canvas
-- If any element is within 0.5 cm of the figure edge: flag.
+- **Autosized nodes widespread** → repair reliability is lower. Upstream fix: add explicit dimensions. Consider doing that first.
+- **`scale` on complex diagram** → coordinates compress but text does not. Compensation in Passes 2–5 is fragile. Upstream fix: redesign at intended size.
+- **No coordinate map** → audit takes longer; spatial relationships must be reverse-engineered from code.
 
 ---
 
-## Visual mode (for `.png` / `.jpg` / single-figure `.pdf`)
+## Step 3: Run the six passes from `tikz_rules.md`
 
-Read the image. Inspect it visually — Claude is multimodal and can see the rendered figure directly. Apply the same three checks, scored by visible whitespace rather than measured distance:
+For each `tikzpicture` in the file, run all six passes **in order**. Follow the protocols and formulas in `tikz_rules.md` exactly — do not paraphrase or estimate.
 
-### Check 1: Curve label collisions
+| Pass | Target | Rule-book section |
+|---|---|---|
+| **0** | Cross-slide consistency | `tikz_rules.md` § Pass 0 |
+| **1** | Bézier curves — do this FIRST | `tikz_rules.md` § Pass 1 |
+| **2** | Edge-label gap calculations | `tikz_rules.md` § Pass 2 |
+| **3** | Arrow-label positioning keywords | `tikz_rules.md` § Pass 3 |
+| **4** | Boundary Rule (labels vs drawn shapes) | `tikz_rules.md` § Pass 4 |
+| **5** | Margin spacing | `tikz_rules.md` § Pass 5 |
 
-Any text that visibly intersects a curved line, arrow shaft, or smoothed regression line.
+Useful greps for each pass:
 
-### Check 2: Label-object overlap
-
-Any text that touches or overlaps a marker, bar, axis line, gridline, or other plot element. Includes legend boxes that overlap the plot area.
-
-### Check 3: Edge clipping
-
-Any label partially cut off by the image boundary, or running into the figure margin. Includes y-axis titles too close to the left edge, x-axis titles too close to the bottom, rotated tick labels overflowing.
-
-### Honest limitation
-
-Visual-mode detection is less reliable than math mode. Reliable: clipping, large overlaps. Less reliable: subtle whitespace violations under a few pixels. When the figure is high-stakes, also run `/tikz` on the source code (.R, .py, or .tex) that generated it — the source has signals the rendering does not.
-
-### Typical fixes by toolchain
-
-**ggplot2 (R)**:
-- Move legend: `theme(legend.position = "top")`
-- Crowded labels: `ggrepel::geom_text_repel()`
-- Edge clipping: `theme(plot.margin = margin(t=10, r=20, b=10, l=20))`
-- Long y-axis title: `theme(axis.title.y = element_text(margin = margin(r=10)))`
-
-**matplotlib (Python)**:
-- Auto-padding: `plt.tight_layout()`
-- Save with bounds: `plt.savefig(..., bbox_inches='tight')`
-- Move legend: `ax.legend(bbox_to_anchor=(1.02, 1), loc='upper left')`
-
-**TikZ (LaTeX)**:
-- Add `\useasboundingbox` to declare canvas explicitly
-- Use `node[anchor=...]` to control label placement relative to coordinate
-- For curves, place label as a separate `\node at (midpoint)` outside the arc, not as inline edge label
-
----
-
-## Output
-
-Report findings as a structured list. Do not enter a repair loop.
-
-```
-[file] — quick check complete
-
-Bezier collisions:    N
-Whitespace collisions: M
-Edge clipping:        K
-
-Findings:
-  - <location>: <description>. Fix: <proposed change>.
-  - ...
+```bash
+grep -n "node.*{" [file].tex | grep -v "^[[:space:]]*%"        # Pass 0 candidates
+grep -n "bend" [file].tex                                       # Pass 1 — every curve
+grep -n "node\[" [file].tex | grep -v "above\|below\|left\|right\|anchor\|pos\|midway\|near"   # Pass 3 violations
 ```
 
-Then **stop**. The user reviews and edits. If they want a deeper look at a specific element, they invoke `/tikz` again on that scope.
+---
+
+## Step 4: Pass 6 — Debug bounding-box verification (skill-specific)
+
+This pass is unique to `/tikz` (it does not appear in `tikz_rules.md` because it's an audit step, not a generation rule).
+
+**Do NOT attempt to visually inspect the PDF by "eyeballing."** Claude cannot reliably see TikZ collisions in rendered PDFs. Instead:
+
+1. **Temporarily add red debug outlines** around every node:
+   ```latex
+   % DEBUG — add to preamble temporarily, remove before shipping
+   \tikzset{every node/.append style={draw=red, very thin}}
+   ```
+
+2. **Compile and inspect**: overlapping bounding boxes are now visible as overlapping red rectangles. Collisions become structurally obvious rather than visually estimated.
+
+3. **For each red-box overlap**: go back to the source, fix coordinates or dimensions, recompile.
+
+4. **Remove the debug line** before declaring the audit complete.
 
 ---
 
-## What this skill does NOT do
+## Step 5: Fix, recompile, repeat
 
-- It does not iterate. One pass, one report, exit.
-- It does not re-audit the whole file after a fix. That's the quadratic blowup that killed the previous version.
-- It does not run `pdflatex` in a loop.
-- It does not eyeball multi-page PDFs. PDF mode is single-figure only; for decks, point it at the source `.tex` instead.
-- It does not perform cross-slide consistency checks, autosized-node detection, scale-factor compensation, or the four other passes the previous version did. If you want those, the prior behavior is in git history at `~/mixtapetools/` HEAD~ before this commit.
+After making fixes:
+
+```bash
+pdflatex -interaction=nonstopmode [file].tex 2>&1 | grep -E "Overfull|Underfull|Error|Warning"
+```
+
+Must return zero lines. Fix any new warnings introduced by repositioning. Repeat until clean.
 
 ---
 
-## Why narrow
+## Step 6: Re-audit the ENTIRE file after any fix
 
-Visual errors that don't produce compile errors are the class Claude Code fundamentally cannot detect during normal work. The agent compiles, sees no warnings, declares done — and the figure has a label sitting on a curve. Three checks, focused on the three errors that compile cleanly, finishing in under five minutes per figure. That is the entire value proposition.
+One collision fix often reveals a second one nearby, or introduces a new label that crowds a different object. After every change, re-run Passes 1–5 on **all** TikZ figures in the file — not just the one you just touched.
+
+```bash
+grep -c "tikzpicture" [file].tex
+```
+
+That count is how many diagrams need a clean bill of health.
+
+---
+
+## Known limitations
+
+These are the cases where `/tikz` is least reliable. The better fix is almost always upstream (rewrite the TikZ safely) rather than downstream (try to repair it).
+
+| Limitation | Why it's hard | Upstream fix |
+|---|---|---|
+| **Autosized nodes** (no `minimum width`/`minimum height`) | Rendered dimensions depend on text + font — `/tikz` can only estimate | Add explicit dimensions (`tikz_rules.md` Rule 1) |
+| **`scale` on complex diagrams** | Coordinates shrink but text does not; gap calc compensation is fragile | Redesign at intended size (`tikz_rules.md` Rule 5) |
+| **Math-mode label widths** | `$\hat{\beta}_{it}$` is wider than character-count × width/char suggests | Overestimate by 20–30% or measure with a test compile |
+| **Nested `tikzpicture` environments** | Coordinate systems interact unpredictably | Flatten into a single environment |
+| **`\foreach` loops generating many nodes** | Per-iteration gap checks; easy to miss one | Write explicit nodes for small counts; check loop bounds for large counts |

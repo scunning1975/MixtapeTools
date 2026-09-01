@@ -1,8 +1,16 @@
 ---
 name: beautiful_deck
-description: End-to-end beautiful Beamer deck creation. Designs an original Beamer theme tailored to a specific audience, restructures existing content via the Rhetoric of Decks (ethos / pathos / logos), generates figures and tables from R/Python/Stata code first, embeds code blocks in the deck, produces standalone walkthrough scripts, compiles to zero warnings, runs /tikz for visual collision cleanup, and dispatches a graphics-only audit agent for label and coordinate checks. Use when creating a presentation from scratch or restructuring existing content into a new beautiful deck.
+description: >-
+  End-to-end beautiful Beamer deck creation. Designs an original Beamer theme
+  tailored to a specific audience, restructures existing content via the
+  Rhetoric of Decks (ethos / pathos / logos), generates figures and tables from
+  R/Python/Stata code first, embeds code blocks in the deck, produces standalone
+  walkthrough scripts, compiles to zero warnings, runs /tikz for visual
+  collision cleanup, and dispatches a graphics-only audit agent for label and
+  coordinate checks. Use when creating a presentation from scratch or
+  restructuring existing content into a new beautiful deck.
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Task
-argument-hint: [content-path-or-description]
+argument-hint: "[audience] [content-path-or-description]"
 ---
 
 # Beautiful Deck
@@ -11,7 +19,7 @@ This skill implements Scott's full deck-creation pipeline. It is NOT just a comp
 
 Scott's philosophy: **a deck is a performance medium, not a document**. It must be beautiful, technically rigorous, smoothly paced (MB/MC equivalence across slides), and visually clean at the pixel level. Every element earns its presence. Every title is an assertion. Every figure carries one message.
 
-This skill is the orchestrator. It calls `/tikz` for visual cleanup, references `compiledeck`'s mechanical rules (preambles, palettes, TikZ measurement formulas), and dispatches sub-agents for rhetoric and graphics audits.
+This skill is the orchestrator. It calls `/tikz` for visual cleanup, draws on its own local reference files (preambles, palettes, TikZ measurement formulas, domain patterns, style preferences) in this skill directory, and dispatches sub-agents for rhetoric and graphics audits.
 
 ---
 
@@ -19,16 +27,13 @@ This skill is the orchestrator. It calls `/tikz` for visual cleanup, references 
 
 You MUST collect answers to these questions before generating a single slide. If the user hasn't provided them in the invocation, ask explicitly. Do not guess.
 
-### Q1: What is the source content?
-- A paper draft (`.tex`, `.pdf`, `.md`)
-- Existing lecture notes
-- An existing deck to be restructured
-- A description and you generate from scratch
-- A paper the user is reading (in which case: have they split-pdf'd it? If yes, read the summaries. If no, ask whether to split-pdf first.)
+### Q1: Who is the audience? (**HARD BLOCK — resolve before any other question**)
 
-### Q2: Who is the audience?
+Audience is the single decision that ripples through every other choice in this skill — the rhetorical balance, the aesthetic direction, the act proportions, the pedagogical pacing all depend on it. Resolve audience first; do not proceed to Q2 (source content), theme design, or anything else until audience is committed.
 
-Pick ONE and commit. Different audiences demand different rhetorical balances (per Aristotle). Cite this table verbatim when confirming with the user:
+**If audience is missing from the invocation, ask immediately.** Use the `AskUserQuestion` tool (if available) to present a structured picker with the 5 canonical buckets as choices plus "Other." If `AskUserQuestion` is not available, ask in plain text and present the 5 canonical buckets as a numbered list. Do not begin theme work, source-content discussion, or anything else until the user has answered.
+
+The 5 canonical buckets (cite this table verbatim when confirming with the user):
 
 | Context | Logos | Ethos | Pathos | Implications for the deck |
 |---|---|---|---|---|
@@ -38,11 +43,41 @@ Pick ONE and commit. Different audiences demand different rhetorical balances (p
 | **Working deck (for coauthors or future-self)** | 60% | 30% | 10% | Document choices, preserve uncertainty, more text allowed, rigor > polish |
 | **External non-academic (policy, media, industry)** | 30% | 25% | 45% | Storytelling, human impact, minimal jargon, visual impact |
 
+**If the user gives free-text audience description (or picks "Other"), map to the closest canonical bucket and confirm with the user before proceeding.** Use this mapping table as a guide:
+
+| Free-text the user might give | Maps to |
+|---|---|
+| "my advisor and one coauthor" | Working deck |
+| "intro economics class" / "undergrad lecture" | Teaching lecture |
+| "general public" / "media interview" | External non-academic |
+| "internal team" / "lab meeting" / "future-self" | Working deck |
+| "policy briefing" / "congressional staff" | External non-academic |
+| "NBER conference" / "AEA session" | Conference presentation |
+| "job market talk" / "research seminar" | Academic seminar |
+
+When confirming the mapping, be explicit: "Mapping your description '<user's free text>' to **<canonical bucket>** — does that match what you have in mind?"
+
+**Sub-specifier for External non-academic.** When the user picks (or maps to) external non-academic, the rhetorical spread within this bucket is wider than within any other bucket. Ask one follow-up before proceeding:
+
+> External non-academic — which sub-context?
+> - **General public / media** (maximum pathos, story-driven, minimum jargon)
+> - **Policy / government / advocacy** (evidence-driven, action-oriented, moderate jargon)
+> - **Industry / corporate** (decision-oriented, ROI framing, domain jargon OK)
+
+Why this bucket only: the other 4 buckets have natural sub-variants (undergrad vs. grad teaching; methods vs. applied seminar) but the rhetorical mix stays largely the same. External is the unique case where the *kind* of pathos shifts, not just the dose.
+
+### Q2: What is the source content?
+- A paper draft (`.tex`, `.pdf`, `.md`)
+- Existing lecture notes
+- An existing deck to be restructured
+- A description and you generate from scratch
+- A paper the user is reading (in which case: have they split-pdf'd it? If yes, read the summaries. If no, ask whether to split-pdf first.)
+
 ### Q3: What is the tone / aesthetic?
 
 Two paths. Pick ONE:
 
-**Path A: Scott's house style (Professional/Academic).** Use the Warm Professional palette from `~/.claude/skills/compiledeck/SKILL.md` (DeepNavy, Teal, WarmOrange, Gold). Scott uses this for outward-facing academic work.
+**Path A: Scott's house style (Professional/Academic).** Use `~/.claude/skills/beautiful_deck/preamble_warm_professional.tex`. This is a ready-to-copy house-style preamble for outward-facing academic work, not a default palette for every deck.
 
 **Path B: Original, audience-specific design.** You design something new — a palette, a frame-title style, a TikZ accent system — tuned to this specific audience. This is the default when Scott says "design for me an original Beamer style." Do NOT reuse a previous deck's theme. You are creating something new.
 
@@ -89,13 +124,15 @@ The goal is: something truly effective for *this* audience, *this* content, and 
 
 ### How to approach it
 
-**If Path A (Scott's house style):** Copy the Warm Professional preamble from `~/.claude/skills/compiledeck/SKILL.md` Step 3 — this IS Scott's house style and is not boilerplate for outward-facing academic work. Proceed to Step 2.
+**If Path A (Scott's house style):** Copy the Warm Professional preamble from `~/.claude/skills/beautiful_deck/preamble_warm_professional.tex` — this IS Scott's house style and is not boilerplate for outward-facing academic work. Proceed to Step 2. Do not use this file as inspiration for Path B unless the user explicitly asks for a deck in that house style.
 
 **If Path B (original design — the default when Scott says "design for me an original Beamer style"):** You are designing an original aesthetic. Follow this process:
 
+Before implementing either path, read `~/.claude/skills/beautiful_deck/style_preferences.md`. Treat it as user-specific stylistic guidance only: it should shape persistent visual preferences such as slide-header treatments, but it does not override audience fit, content needs, or the rhetorical principles in `rhetoric_of_decks.md`.
+
 ### 1.1 Palette construction
 
-Pick a core accent (one color, not an ensemble). This is the emotional anchor of the deck. Examples that have worked:
+Pick a core accent (one color, not an ensemble). This is the emotional anchor of the deck. The examples below illustrate audience-to-color reasoning; they are not a house palette to reuse by default.
 
 | Audience | Core accent | Why |
 |---|---|---|
@@ -124,7 +161,7 @@ If bullets appear at all, use a single `\tikz\fill` circle in the core accent, s
 
 ### 1.4 Section dividers
 
-Full-bleed dark background (core accent or a dark neutral), white text, one large label centered. Use `\transitionslide{Title}{Subtitle}` pattern from `compiledeck/SKILL.md`. This creates the "deck breathes" rhythm — a moment of rest between sections.
+Full-bleed dark background (core accent or a dark neutral), white text, one large label centered. Use `\transitionslide{Title}{Subtitle}` pattern defined in `preamble_warm_professional.tex`. This creates the "deck breathes" rhythm — a moment of rest between sections.
 
 ### 1.5 Typography
 
@@ -174,7 +211,7 @@ Every deck has three acts. The proportions depend on audience (see Q2 table).
 
 **Act I — Tension (open + setup).** 2–4 slides.
 - Title slide.
-- Opening hook: a provocative question, a surprising statistic, or a concrete problem the audience recognizes. **NOT** an agenda, **NOT** "Today I'm going to talk about...", **NOT** a definition slide. See `presentations/rhetoric_of_decks.md` Part IV "The Opening" for examples.
+- Opening hook: a provocative question, a surprising statistic, or a concrete problem the audience recognizes. **NOT** an agenda, **NOT** "Today I'm going to talk about...", **NOT** a definition slide. See `rhetoric_of_decks.md` Part IV "The Opening" for examples.
 - The stakes: why does this matter? (This is where pathos lives.)
 - The roadmap (optional — only for teaching decks > 30 slides).
 
@@ -202,6 +239,21 @@ Every slide title must state a claim. Examples:
 | Implications | A smaller subsidy would have generated the same K/L response |
 
 If someone reads only the titles in sequence, they should understand the entire argument. Test this: write out just the titles. Does the sequence tell a coherent story? If not, your arc is broken.
+
+### Title length and line breaks
+
+Assertion titles should normally fit on one line. A title that wraps is usually trying to do body-text work. Rewrite it shorter before adding title-template machinery.
+
+Use this order:
+
+1. Keep the assertion, but remove setup words.
+2. Replace a clause with a sharper verb.
+3. Move qualifiers into the visual, caption, speaker notes, or the next slide.
+4. Split the slide if the full assertion needs multiple clauses.
+
+When line breaks are unavoidable, break only between words whenever possible. Do not rely on hyphenating or splitting a word across lines to make a title or body text fit; rewrite, resize the specific element, or change the layout first.
+
+This applies everywhere text appears, including TikZ nodes, table cells, callout boxes, captions, and screenshot placeholders. Short labels are especially sensitive: a two-word label such as "paper extraction" may wrap between words, but an ordinary word like "paper" or "sessions" must not be split across lines. If a word breaks inside a constrained box, widen the box or column, shorten the phrase, reduce only that local font size, or redesign the layout.
 
 ### The outline checkpoint
 
@@ -313,7 +365,7 @@ Work slide by slide, but also slide-sequence by slide-sequence. For each slide, 
 
 1. Re-read the outline to confirm this slide's role in the arc.
 2. **Check the pedagogical movement within the section.** Where are we in the Narrative → Application → Picture → Codeblock → Technical sequence? If we are writing a technical slide, confirm that the preceding slides have already delivered the story, the application, the picture, and (if relevant) the code. If they have not, back up and write those slides first. Never let the technical arrive before the intuition.
-3. Write the title as an assertion.
+3. Write the title as an assertion that fits on one line unless there is a deliberate exception.
 4. Pick ONE visual element: a figure, an equation, a diagram, a single statistic, a code block. Not two.
 5. Add minimal supporting text — a labeled setup ("From the FOC:", "Step 1:") or ONE concluding line. NEVER a wall of sentences.
 6. Check: can someone in the back row read every character? If not, cut text or increase font.
@@ -321,6 +373,8 @@ Work slide by slide, but also slide-sequence by slide-sequence. For each slide, 
 ### 4.2 The hard rules (no exceptions)
 
 - **One idea per slide.** Two max for inseparable contrasts.
+- **One-line assertion titles by default.** If a title wraps, rewrite it shorter before engineering around the wrap.
+- **Do not split words across lines when avoidable.** Hyphenated or broken words are a last resort; prefer rewriting, resizing the specific element, or changing layout. This includes TikZ nodes and table cells, not just prose text.
 - **No wall of sentences.** If you catch yourself writing a sentence that narrates what the audience can see, delete it.
 - **No bullet lists by default.** Find the structure (sequence, contrast, hierarchy, causal chain) and make it visible with layout.
 - **No decoration without function.** Stock photos, clip art, decorative icons — delete.
@@ -490,15 +544,17 @@ Apply all fixes the skill suggests, then recompile. Go back to Step 5 if any new
 
 Dispatch a sub-agent (via the Task tool) to evaluate the deck against the Rhetoric of Decks principles. Give it the following task prompt:
 
-> You are Referee 2 in rhetoric-review mode. Audit the Beamer deck at `<deck>.tex` and its compiled PDF at `<deck>.pdf` against the principles in `~/mixtapetools/presentations/rhetoric_of_decks.md`. Check specifically:
+> You are Referee 2 in rhetoric-review mode. Audit the Beamer deck at `<deck>.tex` and its compiled PDF at `<deck>.pdf` against the principles in `~/.claude/skills/beautiful_deck/rhetoric_of_decks.md`. Check specifically:
 >
 > 1. **Titles are assertions.** Read the titles in sequence. Do they tell a coherent story? List any title that is a label rather than an assertion, with a suggested rewrite.
-> 2. **One idea per slide.** List any slide with two or more competing ideas.
-> 3. **No wall of sentences.** List any slide with more than two prose sentences stacked vertically.
-> 4. **MB/MC equivalence.** Rate each slide's density on a 1–5 scale. Flag outliers (slides that are dramatically denser or sparser than their neighbors).
-> 5. **Narrative arc.** Does the deck have a clear Setup / Development / Resolution structure? Does the opening hook and does the closing linger?
-> 6. **Devil's Advocate.** Is there a slide addressing the strongest objection? If the context is academic or external, this is required.
-> 7. **Audience fit.** Does the rhetorical balance (ethos / pathos / logos) match the audience declared at Step 0?
+> 2. **Title line discipline.** Flag assertion titles that wrap or are likely to wrap. Suggest shorter one-line rewrites. Also flag avoidable word breaks or hyphenation used only to make text fit.
+> 3. **One idea per slide.** List any slide with two or more competing ideas.
+> 4. **No wall of sentences.** List any slide with more than two prose sentences stacked vertically.
+> 5. **Microtext fit.** Check TikZ nodes, table cells, callout boxes, captions, and placeholders for ordinary words split across lines. Suggest wider boxes/columns, shorter phrases, local font changes, or layout changes.
+> 6. **MB/MC equivalence.** Rate each slide's density on a 1–5 scale. Flag outliers (slides that are dramatically denser or sparser than their neighbors).
+> 7. **Narrative arc.** Does the deck have a clear Setup / Development / Resolution structure? Does the opening hook and does the closing linger?
+> 8. **Devil's Advocate.** Is there a slide addressing the strongest objection? If the context is academic or external, this is required.
+> 9. **Audience fit.** Does the rhetorical balance (ethos / pathos / logos) match the audience declared at Step 0?
 >
 > Return a structured report with numbered concerns and suggested rewrites. Do NOT modify the deck source — only diagnose. The main agent will apply fixes.
 
@@ -578,7 +634,7 @@ Report to the user:
 
 ---
 
-## Reference: The Three Laws (per `presentations/rhetoric_of_decks.md`)
+## Reference: The Three Laws (per `rhetoric_of_decks.md`)
 
 These are the constants that hold across every audience, every aesthetic, every deck. Read them once and internalize:
 
@@ -586,7 +642,7 @@ These are the constants that hold across every audience, every aesthetic, every 
 2. **Cognitive load is the enemy.** One idea per slide. Two max for inseparable contrasts. If you need "also" or "additionally," you need a new slide.
 3. **The slide serves the spoken word.** The slide is the visual anchor for what you say — not what you say. If your slides can be understood without you speaking, you have written a document and called it a presentation.
 
-## Reference: The Aristotelian triad (per `presentations/rhetoric_of_decks.md` Part II)
+## Reference: The Aristotelian triad (per `rhetoric_of_decks.md` Part II)
 
 - **Ethos (credibility).** The audience asks: *Why should I trust this person?* Ethos lives in methodology slides, Devil's Advocate slides, honest scorecards, acknowledgment of limitations. Admitting weakness builds credibility.
 - **Pathos (emotion).** The audience asks: *Why should I care?* Pathos lives in opening hooks, stakes, human impact, aspiration. Pathos without logos is demagoguery.
@@ -598,15 +654,24 @@ The rhetorical balance depends on the audience — see Q2 in Step 0.
 
 ## Full Philosophy Reference
 
-For the complete essay behind these principles:
-- `~/mixtapetools/presentations/rhetoric_of_decks.md` — the condensed operational version
-- `~/mixtapetools/presentations/rhetoric_of_decks_full_essay.md` — the 600-line intellectual genealogy from Aristotle through LLMs
+For the complete essay behind these principles, all in this skill directory:
+- `rhetoric_of_decks.md` — the condensed operational version
+- `rhetoric_of_decks_full_essay.md` — the 600-line intellectual genealogy from Aristotle through LLMs
+- `style_preferences.md` — user-specific stylistic defaults that persist across decks; separate from rhetorical principles.
 
 This skill operationalizes those essays. You don't need to re-read them to execute the workflow — just follow the steps above.
 
+## Local reference files
+
+All in this skill directory (`~/.claude/skills/beautiful_deck/`):
+
+- `preamble_warm_professional.tex` — Scott's house-style Beamer preamble (palette, fonts, footline, `\transitionslide` macro). Copy verbatim for Path A decks.
+- `palette_reference.md` — alternative palettes with selection guidance for Path B (original-design) decks.
+- `domain_patterns.md` — detailed structural patterns by audience (academic seminar, teaching lecture, working deck, etc.).
+- `~/.claude/skills/tikz/tikz_rules.md` — measurement-based collision-prevention rules (lives in the `tikz` skill folder; this skill **depends on `/tikz` being installed**). READ before writing any TikZ figure (Step 4.4).
+
 ## Supporting skills
 
-- `compiledeck` — the mechanical compile loop, preamble templates, palette reference, TikZ rules. `beautiful_deck` references it for these pieces rather than duplicating them.
 - `tikz` — the measurement-based visual collision audit. Invoked at Step 6.
 - `referee2` — the full five-audit protocol. `beautiful_deck` uses its rhetoric-audit logic in Step 7.
 - `split-pdf` — if the source content is a paper the user is reading, split it first and work from the summaries.
