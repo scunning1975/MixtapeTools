@@ -33,19 +33,25 @@ my-project-name/
 │   ├── figures/
 │   ├── tables/
 │   └── logs/                          # Log files from all scripts
-├── documents/                         # Outside PDFs, papers
+├── documents/                         # Outside PDFs, papers (split with /split-pdf)
 ├── references/
 │   └── raw/                           # Paper PDFs for reference-ingest skills
 ├── decks/                             # Beamer presentations
-├── notes/                             # Personal scratch notes
+├── notes/                             # Personal scratch notes; ignored by git in git-enabled projects
 ├── agent_memory/                      # Shared Claude/Codex reference files
 │   ├── key_decisions.md               # Methodological choices and rationale
 │   ├── dropped_analyses.md            # Paths abandoned and why
 │   ├── codebook.md                    # Variable definitions
 │   └── sample_restrictions.md         # Who's in/out of the sample
 ├── correspondence/                    # Letters, emails, audit reports
+│                                      # `referee2/` and `blindspot/` subdirs are created
+│                                      # lazily by those skills on first use
 └── progress_logs/                     # Session logs for continuity across Claude conversations
 ```
+
+Use `references/raw/` for PDFs of papers or other sources you want to process with `/split-pdf`, `/read-pdf`, `/bib-update`, and/or `/wiki-update`. The reference-ingest skills create their own derived files lazily: `/wiki-update` creates `references/wiki/`, and `/bib-update` creates `references/references.bib`.
+
+If wanting to link your project to Obsidian, simply go to `Obsidian → Manage vaults → Open folder as vault` and select your project folder as a new vault. This allows each project to be cleanly differentiated and you won't have to worry about backlink-collision across projects.
 
 ## Philosophy
 
@@ -69,14 +75,16 @@ The `progress_logs/` directory solves a real problem: Claude Code sessions don't
 
 - `documents/` holds outside PDFs — papers you're reading, referee reports, data documentation. These are candidates for the `/split-pdf` skill, which splits large PDFs into safe 4-page chunks for reading.
 
-- `references/raw/` holds PDFs of papers and other sources you want to process with `/split-pdf`, `/read-pdf`, `/bib-update`, and/or `/wiki-update`. `/wiki-update` creates `references/wiki/` when needed; `/bib-update` creates `references/references.bib` when needed.
-
-- `decks/` holds Beamer presentations built following the rhetoric of decks philosophy (`~/mixtapetools/presentations/rhetoric_of_decks.md`). Titles are assertions, one idea per slide, beauty is function.
+- `decks/` holds Beamer presentations built following the rhetoric of decks philosophy (`~/.claude/skills/beautiful_deck/rhetoric_of_decks.md`). Titles are assertions, one idea per slide, beauty is function.
 
 ### Data Discipline
 
 - `data/raw/` is **read-only** by convention. Original source data goes here and is never modified.
 - `data/clean/` holds everything that's been transformed, merged, or constructed. Scripts in `code/` take raw data and produce clean data.
+
+## First-time setup
+
+Before using a generated project, fill in the placeholders in its root `CLAUDE.md`, especially `[NAME]`, collaborators, project overview, data sources, and key files. Put durable project memory in `agent_memory/`, not `notes/`.
 
 ## Installation
 

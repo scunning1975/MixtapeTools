@@ -1,0 +1,2 @@
+# Python dependencies for {{PROJECT_NAME}}
+# Install with: pip install -r code/requirements.txt
