@@ -1,7 +1,7 @@
 ---
 name: blindspot
 description: Peripheral vision audit for empirical output. Finds what the author cannot see — problems hiding in plain sight (vices) and opportunities being overlooked (virtues). Inspired by Viktor Shklovsky's defamiliarization and conversations with Jason Fletcher. Use when output exists and interpretation is about to happen.
-allowed-tools: Read, Bash(ls*), Bash(cat*), Glob, Grep
+allowed-tools: Read, Write, Bash(ls*), Bash(cat*), Bash(mkdir:*), Glob, Grep
 argument-hint: '[path-to-figure, table, or results file] [brief description of what you think the main finding is]'
 ---
 
@@ -152,7 +152,9 @@ Natural variation they haven't leveraged. A falsification test that would demoli
 
 ## The Report
 
-After working through all four quadrants, produce a Blindspot Report:
+After working through all four quadrants, produce a Blindspot Report. **Write the report to `correspondence/blindspot/YYYY-MM-DD_<output-slug>.md`** in the project root, where `<output-slug>` is a short kebab-case description of the audited output (e.g., `event-study-fig`, `table-3`). If `correspondence/blindspot/` does not exist yet, create it lazily: `mkdir -p correspondence/blindspot`. Also surface the report inline in the chat so the user can react in real time.
+
+Report template:
 
 ```
 ## Blindspot Report
