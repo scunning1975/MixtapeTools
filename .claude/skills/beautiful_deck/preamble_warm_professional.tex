@@ -1,0 +1,85 @@
+% Warm Professional Beamer preamble
+% Scott's house style — outward-facing academic decks.
+% Copy this verbatim into a new deck's .tex (or `\input` it).
+
+\documentclass[aspectratio=169,11pt]{beamer}
+
+% Packages
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{tikz}
+\usepackage{pgfplots}
+\usepackage{xcolor}
+\usepackage{ragged2e}
+\usepackage{colortbl}
+\usepackage{array}
+\usepackage{hyperref}
+\usepackage{adjustbox}
+
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, calc,
+                backgrounds, decorations.pathreplacing, shadows, fadings}
+\pgfplotsset{compat=1.18}
+
+% --- Color Palette: Warm Professional ---
+\definecolor{DeepNavy}{HTML}{2E4057}
+\definecolor{Teal}{HTML}{048A81}
+\definecolor{WarmOrange}{HTML}{E85D04}
+\definecolor{SoftPurple}{HTML}{9D4EDD}
+\definecolor{WarmGray}{HTML}{6C757D}
+\definecolor{LightGray}{HTML}{E9ECEF}
+\definecolor{Cream}{HTML}{FBF8F1}
+\definecolor{DeepRed}{HTML}{D62828}
+\definecolor{Gold}{HTML}{D4A03A}
+\definecolor{SoftWhite}{HTML}{FAFAFA}
+
+% Beamer colors
+\setbeamercolor{normal text}{fg=DeepNavy, bg=SoftWhite}
+\setbeamercolor{structure}{fg=DeepNavy}
+\setbeamercolor{alerted text}{fg=DeepRed}
+\setbeamercolor{example text}{fg=Teal}
+\setbeamercolor{frametitle}{fg=DeepNavy, bg=SoftWhite}
+\setbeamercolor{title}{fg=DeepNavy}
+\setbeamercolor{subtitle}{fg=WarmGray}
+\setbeamercolor{block title}{bg=DeepNavy, fg=SoftWhite}
+\setbeamercolor{block body}{bg=LightGray, fg=DeepNavy}
+\setbeamercolor{itemize item}{fg=WarmOrange}
+\setbeamercolor{itemize subitem}{fg=Gold}
+
+% Fonts
+\usefonttheme{professionalfonts}
+\setbeamerfont{title}{size=\huge, series=\bfseries}
+\setbeamerfont{frametitle}{size=\Large, series=\bfseries}
+
+% Strip chrome
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{headline}{}
+
+% Minimal footline
+\setbeamertemplate{footline}{%
+    \hfill
+    \begin{beamercolorbox}[wd=3cm,ht=2.5ex,dp=1ex,right,rightskip=0.6cm]{page number}
+        \usebeamercolor[fg]{WarmGray}\scriptsize\insertframenumber
+    \end{beamercolorbox}
+    \vspace{0.3cm}
+}
+
+% Bullets
+\setbeamertemplate{itemize item}{\footnotesize\raisebox{0.3ex}{\tikz\fill[WarmOrange] (0,0) circle (0.45ex);}}
+\setbeamertemplate{itemize subitem}{\footnotesize\raisebox{0.3ex}{\tikz\fill[Gold] (0,0) circle (0.35ex);}}
+
+% Custom commands
+% \transitionslide{Title}{Subtitle} — full-bleed dark transition between sections
+\newcommand{\transitionslide}[2]{%
+    {\setbeamercolor{normal text}{fg=SoftWhite,bg=DeepNavy}
+    \begin{frame}[plain]\vfill\begin{center}
+        {\huge\bfseries\textcolor{Gold}{#1}}\\[0.6cm]
+        {\large\textcolor{LightGray}{#2}}
+    \end{center}\vfill\end{frame}}
+}
+
+\graphicspath{{figures/}}
